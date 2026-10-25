@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101918">
+  <meta name="description" content="星环接力：与你的伙伴，一起点亮太空。2–4 人实时联机合作游戏。">
+  <title>ORBIT RELAY · 星环接力</title>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg">
+  <link rel="stylesheet" href="/style.css">
+  <script src="/socket.io/socket.io.js" defer></script>
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <noscript>请在浏览器中启用 JavaScript，才能连接星环接力游戏服务器。</noscript>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="/" aria-label="星环接力首页"><span class="brand-symbol">✳</span><span>ORBIT<span class="brand-light"> / RELAY</span><small>星 环 接 力</small></span></a>
+      <div class="nav-center"><span class="tiny-dot"></span> 合作航行计划 <span class="muted">/ VOL. 001</span></div>
+      <div class="nav-actions"><button id="help-button" class="text-button">玩法指南 <span>↗</span></button><button id="sound-button" class="icon-button" aria-label="开启音效" title="开启音效">♫<span class="sound-slash">／</span></button></div>
+    </header>
+
+    <main>
+      <section class="page-heading">
+        <div><div class="eyebrow"><span class="tag">CO-OP ARCADE</span><span>2–4 人 · 实时联机</span></div><h1 id="headline">把微光，<span>送回星环。</span></h1><p id="subtitle">宇宙很大。好在，这一次不是独自出发。</p></div>
+        <div class="mission-stamp"><span class="stamp-orbit">✧</span><span>SMALL CREW.<br>BIG CONNECTION.</span><b>01 / ∞</b></div>
+      </section>
+
+      <div class="game-layout">
+        <aside class="left-rail">
+          <section class="panel embark-panel" id="entry-panel">
+            <div class="panel-kicker">01 / BOARDING</div><h2>准备登舰</h2><p class="panel-description">叫上伙伴，来一场星际接力。</p>
+            <label for="player-name">你的呼号</label><input id="player-name" maxlength="16" placeholder="例如：宇宙便利店" autocomplete="nickname">
+            <button id="create-button" class="primary-button full">创建新房间 <span>↗</span></button>
+            <div class="divider"><span>或加入伙伴的航行</span></div>
+            <form id="join-form"><label for="room-input">房间码</label><div class="join-row"><input id="room-input" maxlength="5" minlength="5" placeholder="XXXXX" aria-label="五位房间码" autocomplete="off" autocapitalize="characters" spellcheck="false" required pattern="[A-HJ-NP-Za-hj-np-z2-9]{5}"><button class="square-button" type="submit" aria-label="加入房间">→</button></div></form>
+            <div class="entry-note"><span>⌁</span> 连接同一 Wi-Fi，打开同一服务器地址。</div>
+          </section>
+
+          <section class="panel room-panel" id="room-panel" hidden>
+            <div class="panel-kicker">01 / YOUR CREW</div><div class="section-heading"><h2>你的航行小队</h2><span class="live-pill">LIVE</span></div>
+            <p class="panel-description">把房间码告诉同一网络的伙伴。</p><div class="code-display" id="room-code">— — — — —</div>
+            <button id="invite-button" class="secondary-button full">复制邀请链接 <span>⤴</span></button>
+            <div class="lobby-actions" id="lobby-actions"><button id="ready-button" class="primary-button full">我准备好了</button><button id="start-button" class="secondary-button full" hidden>全员就绪 · 启动任务 ↗</button><button id="claim-button" class="secondary-button full" hidden>房主未响应 · 接管开局 ↗</button><p id="ready-hint" class="tiny-copy">等待至少 2 名领航员准备</p></div>
+            <div id="personal-status" class="personal-status" hidden><span class="panel-kicker">YOUR CARGO</span><strong id="cargo-label">双手空空，去寻找微光</strong><span id="cargo-hint">靠近能量核，按 E 拾取</span></div>
+            <button id="leave-button" class="text-button leave-button">← 离开房间</button>
+          </section>
+
+          <section class="objective-card"><div class="panel-kicker">THE MISSION</div><h3>一起点亮，<br>一整个宇宙。</h3><p>将能量核送到同色泊位，<br>在倒计时结束前守住星环。</p><div class="objective-numbers"><div><strong data-config="target">18</strong><span>能量核</span></div><i></i><div><strong><span data-config="duration">150</span><span>s</span></strong><span>共同挑战</span></div></div><div class="orbit-decoration" aria-hidden="true">✳</div></section>
+          <details class="network-details"><summary>局域网连接地址 <span>＋</span></summary><p>伙伴应打开以下地址之一，再输入房间码。请选择本机 Wi-Fi 或以太网地址。</p><div id="network-urls">正在读取…</div><p>若无法连接，请检查是否同一网络，以及防火墙是否允许 Node.js 接收入站连接。</p></details>
+        </aside>
+
+        <section class="arena-panel" aria-label="星环战场">
+          <div class="arena-top"><div class="arena-title"><span class="tiny-dot"></span><span>KEPLER STATION</span><span class="station-id">/ RLY–07</span></div><span class="connection-status" id="connection-status">连接中…</span></div>
+          <div class="hud"><div class="hud-item"><span>已送达 <small>DELIVERED</small></span><strong><b id="delivered-value">00</b><i> / <span id="hud-goal">18</span></i></strong></div><div class="stability-hud"><div><span>星环稳定度</span><strong id="stability-value">100<span>%</span></strong></div><div class="stability-track"><i id="stability-bar"></i></div></div><div class="hud-item timer-hud"><span>剩余时间</span><strong id="timer-value">02:30</strong></div></div>
+          <div class="arena-stage" id="arena-stage"><canvas id="world" aria-label="星环空间站，使用方向键或 WASD 移动，E 交互，空格冲刺"></canvas>
+            <div class="arena-coordinates">SECTOR 07<br>23° 41′ N</div><div class="arena-coordinate-bottom">ORBITAL TRANSFER GRID <span>●</span></div>
+            <div class="arena-banner" id="arena-banner"><span class="banner-dot"></span><span id="banner-text">航道已就绪 · 等待领航员接入</span></div>
+            <div class="countdown-overlay" id="countdown-overlay" hidden><span>准备好，一起出发</span><strong id="countdown-number">3</strong></div>
+            <div class="result-overlay" id="result-overlay" hidden><div class="result-mark" id="result-mark">✳</div><div class="panel-kicker">MISSION REPORT</div><h2 id="result-title">星环，重新闪耀。</h2><p id="result-description"></p><div id="result-stats" class="result-stats"></div><button id="again-button" class="primary-button">再来一次 ↗</button><p class="tiny-copy" id="result-action-hint">全员准备后，由房主开启下一局</p></div>
+            <div class="reconnect-overlay" id="reconnect-overlay" hidden><span class="loader"></span><h2>正在找回你的信号</h2><p id="reconnect-copy">席位保留 90 秒，连接恢复后继续航行。</p><button id="retry-button" class="secondary-button">重新连接</button><button id="forget-button" class="text-button">返回登舰界面</button></div>
+          </div>
+          <div class="arena-bottom"><div class="context-hint" id="context-hint"><span>✧</span> 微光在等你，伙伴也是。</div><span id="combo-label" class="combo-label">CHAIN ×0 · RELAY 0</span><div id="event-ticker" class="event-ticker" role="status">等待小队信号…</div></div>
+          <div class="touch-controls" id="touch-controls"><div id="joystick" class="joystick" role="group" aria-label="触屏移动摇杆"><div class="joystick-cross"></div><div id="joystick-thumb" class="joystick-thumb"></div></div><div class="touch-emotes"><button id="emote-menu-button" aria-label="呼叫队友" aria-expanded="false">呼叫</button><div id="emote-menu" class="emote-menu" hidden><button data-emote="这里！">这里！</button><button data-emote="漂亮！">漂亮！</button><button data-emote="收到">收到</button></div></div><div class="touch-actions"><button id="touch-dash" class="touch-button dash-touch" aria-label="冲刺">↗<small id="touch-dash-label">冲刺</small></button><button id="touch-interact" class="touch-button interact-touch">✧<small id="touch-action-label">拾取</small></button></div></div>
+        </section>
+
+        <aside class="right-rail">
+          <section class="crew-section"><div class="section-heading"><h2>领航员</h2><span id="crew-count" class="mono muted">0 / 4</span></div><div class="crew-list" id="crew-list"></div><p class="crew-note" id="crew-note">最好的航行，<br>从一句「一起吗」开始。</p></section>
+          <section class="guide-section"><div class="section-heading"><h2>接力三步曲</h2><span>↘</span></div><div class="guide-step"><span class="step-number">01</span><div><h3>收集微光</h3><p>靠近能量核，拾起属于星环的能量。</p></div><span class="step-art">✧</span></div><div class="guide-step"><span class="step-number">02</span><div><h3>找到同色泊位</h3><p>颜色与形状一一对应，抵达后交付。</p></div><span class="step-art">◎</span></div><div class="guide-step"><span class="step-number">03</span><div><h3>让默契发生</h3><p>抛给伙伴再交付，获得额外稳定度。</p></div><span class="step-art">⇌</span></div></section>
+          <section class="activity-section"><div class="section-heading"><h2>航行日志</h2><span class="tiny-dot"></span></div><div id="activity-log" class="activity-log"><p>等待第一位领航员…</p></div></section>
+        </aside>
+      </div>
+
+      <footer class="controls-footer"><div class="keyboard-guide"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> 移动</span><span><kbd>E</kbd> 拾取 / 投递 / 抛出</span><span><kbd>SPACE</kbd> 冲刺避开干扰波</span></div><div class="emote-buttons"><button data-emote="这里！" title="呼叫队友">这里！ <span>1</span></button><button data-emote="漂亮！" title="鼓励队友">漂亮！ <span>2</span></button><button data-emote="收到" title="回应队友">收到 <span>3</span></button></div></footer>
+      <div class="page-bottom"><span>BUILT FOR LITTLE MOMENTS TOGETHER.</span><span>同一片星空，同一支小队。 <span class="lime">✳</span></span></div>
+    </main>
+  </div>
+
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+  <dialog id="confirm-dialog"><span class="panel-kicker">CONFIRM ACTION</span><h2 id="confirm-title"></h2><p id="confirm-copy"></p><div class="confirm-actions"><button id="confirm-cancel" class="secondary-button">取消</button><button id="confirm-accept" class="primary-button"></button></div></dialog>
+  <dialog id="help-dialog"><button id="close-help" class="dialog-close" aria-label="关闭指南">×</button><span class="panel-kicker">FLIGHT MANUAL / 001</span><h2>把接力变成默契。</h2><p><span data-config="minPlayers">2</span>–<span data-config="maxPlayers">4</span> 人共享一座正在流失能量的星环。在 <span data-config="duration">150</span> 秒内交付 <span data-config="target">18</span> 个能量核，且不让稳定度归零。局中打开指南时，其他玩家和倒计时仍会继续。</p><div class="help-grid"><div><h3>移动与交互</h3><p>WASD / 方向键移动。按 E 拾起附近的能量核；到对应泊位按 E 交付；在其他位置按 E 沿朝向抛出。手机使用摇杆与右侧按钮。</p></div><div><h3>别被干扰波追上</h3><p>红色干扰波会从中心向外扩散。空格 / Shift 冲刺有短暂无敌，冷却 <span data-config="dashCooldown">3.2</span> 秒。被击中会掉核、短暂眩晕并扣除团队稳定度。</p></div><div><h3>接力与连击</h3><p>接住别人抛出的能量核再交付，额外恢复 <span data-config="relayBonus">4</span> 点稳定度。<span data-config="comboWindow">8</span> 秒内连续交付可累积最多 <span data-config="maxCombo">5</span> 连击，恢复更多能量。</p></div><div><h3>和伙伴连接</h3><p>伙伴打开同一服务器的局域网地址，输入房间码。全员准备后由房主开始；从最近一次大厅变化（成员加入/离开/断线/重连或准备变化）或房主操作算起，房主超过 <span data-config="hostIdleMs" data-divide="1000">30</span> 秒未响应时，至少两名已准备的队员可接管；成员刚加入或刚准备不会立即触发接管。断线席位保留 <span data-config="reservationMs" data-divide="1000">90</span> 秒；使用原标签页刷新可恢复。服务器重启会清空房间。</p></div></div><button id="got-it" class="primary-button">收到，准备出发 ↗</button></dialog>
+</body>
+</html>
