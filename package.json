@@ -12,7 +12,14 @@
     "test:round": "node scripts/verify-round.mjs",
     "test:browser": "node scripts/browser-qa.mjs"
   },
-  "engines": { "node": ">=22" },
-  "dependencies": { "socket.io": "^4.8.1" },
-  "devDependencies": { "socket.io-client": "^4.8.1" }
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "socket.io": "^4.8.1"
+  },
+  "devDependencies": {
+    "socket.io-client": "^4.8.1"
+  },
+  "license": "MIT"
 }

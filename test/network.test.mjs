@@ -176,3 +176,26 @@ test('HTTP health works, source paths denied, foreign origins rejected', { timeo
   const s = io(url, { transports: ['websocket'], forceNew: true, reconnection: false, extraHeaders: { Origin: 'https://unrelated.example' } });
   t.after(() => s.disconnect()); const [err] = await once(s, 'connect_error'); assert.ok(err);
 });
+
+test('failed creation never consumes capacity, including across fresh sockets', {timeout:10000}, async t => {
+  const {server,connect}=await setup(t);
+  for(let i=0;i<5;i++){
+    const socket=await connect();
+    const failed=await request(socket,'join',{create:true,token:'invalid',name:'test'});
+    assert.equal(failed.ok,false);assert.equal(server.rooms.size,0);socket.disconnect();
+  }
+  const socket=await connect();
+  assert.equal((await request(socket,'join',{create:true,name:'valid'})).ok,true);
+  assert.equal(server.rooms.size,1);
+});
+test('creation admission is shared across reconnects', {timeout:10000}, async t => {
+  const server=createGameServer({port:0,host:'127.0.0.1',maxCreatesPerMinute:2});
+  const address=await server.listen(), sockets=[];
+  t.after(async()=>{sockets.forEach(s=>s.disconnect());await server.close()});
+  for(let i=0;i<3;i++){
+    const s=io(`http://127.0.0.1:${address.port}`,{transports:['websocket'],forceNew:true,reconnection:false});sockets.push(s);await once(s,'connect');
+    const result=await request(s,'join',{create:true,token:'invalid'});
+    assert.equal(result.ok,false);if(i===2)assert.match(result.error,/频繁/);s.disconnect();
+  }
+  assert.equal(server.rooms.size,0);
+});

@@ -147,6 +147,7 @@ function renderUI() {
   const me = state?.players.find(p => p.id === selfId);
   const playing = state?.phase === 'playing', countdown = state?.phase === 'countdown', finished = state?.phase === 'finished';
   const touchMode = matchMedia('(pointer: coarse)').matches || innerWidth <= 700;
+  document.body.classList.toggle('room-open', inRoom);
   document.body.classList.toggle('flight-focus', inRoom && (playing || countdown));
   $('entry-panel').hidden = inRoom; $('room-panel').hidden = !inRoom;
   $('lobby-actions').hidden = playing || countdown; $('personal-status').hidden = !playing;

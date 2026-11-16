@@ -9,8 +9,15 @@ import { CONFIG, makeRoom, addPlayer, addEvent, disconnectPlayer, removePlayer, 
 
 const PUBLIC = fileURLToPath(new URL('./public/', import.meta.url));
 const mime = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.svg': 'image/svg+xml' };
-export function createGameServer({ port = 3000, host = '0.0.0.0' } = {}) {
-  const rooms = new Map();
+export function createGameServer({ port = 3000, host = '0.0.0.0', maxConnections = 128, maxConnectionsPerIp = 16, maxCreatesPerMinute = 12 } = {}) {
+  const rooms = new Map(), connections = new Map(), creates = new Map();
+  const allowCreate = ip => {
+    const now = Date.now();
+    for (const [key, value] of creates) if (now - value.since >= 60_000) creates.delete(key);
+    let bucket = creates.get(ip);
+    if (!bucket) { bucket = {since: now, count: 0}; creates.set(ip, bucket); }
+    if (++bucket.count > maxCreatesPerMinute) throw new Error('创建房间过于频繁，请稍后重试。');
+  };
   const httpServer = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, 'http://localhost');
@@ -45,6 +52,13 @@ export function createGameServer({ port = 3000, host = '0.0.0.0' } = {}) {
       callback(null, allowed);
     } });
   const publish = room => { room.revision++; io.to(room.code).emit('state', snapshot(room)); };
+  io.use((socket, next) => {
+    const ip = socket.handshake.address;
+    if (io.engine.clientsCount > maxConnections || (connections.get(ip) || 0) >= maxConnectionsPerIp) return next(new Error('连接数已达上限，请稍后重试。'));
+    connections.set(ip, (connections.get(ip) || 0) + 1);
+    socket.once('disconnect', () => { const n = (connections.get(ip) || 1)-1; if(n)connections.set(ip,n);else connections.delete(ip); });
+    next();
+  });
   io.on('connection', socket => {
     socket.data.binding = null;
     let budget = 100, budgetAt = Date.now();
@@ -69,11 +83,13 @@ export function createGameServer({ port = 3000, host = '0.0.0.0' } = {}) {
       if (!data || typeof data !== 'object') throw new Error('无效的加入请求。');
       let room;
       if (data.create === true) {
+        allowCreate(socket.handshake.address);
+        if (data.token) throw new Error('新建房间不能使用重连凭据。');
         if (rooms.size >= 100) throw new Error('服务器房间已满，请稍后再试。');
         const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
         let code;
         do { code = Array.from({ length: 5 }, () => alphabet[randomInt(alphabet.length)]).join(''); } while (rooms.has(code));
-        room = makeRoom(code); rooms.set(code, room);
+        room = makeRoom(code);
       } else {
         const code = String(data.code || '').toUpperCase().trim();
         room = rooms.get(code);
@@ -87,6 +103,7 @@ export function createGameServer({ port = 3000, host = '0.0.0.0' } = {}) {
         room.hostActionAt = Date.now();
         addEvent(room, 'join', `${p.name} 已恢复连接`);
       } else p = addPlayer(room, data.name);
+      if (data.create === true) rooms.set(room.code, room);
       if (room.phase === 'playing') p.invulnerable = Math.max(p.invulnerable, CONFIG.joinShield);
       if (!room.players.some(q => q.id === room.hostId && q.connected)) room.hostId = p.id;
       p.socketId = socket.id; socket.data.binding = { code: room.code, id: p.id };
